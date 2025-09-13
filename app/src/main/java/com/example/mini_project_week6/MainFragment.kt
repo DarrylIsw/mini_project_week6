@@ -11,10 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-
+import kotlinx.coroutines.*
 
 class MainFragment : Fragment(R.layout.fragment_main) {
 
@@ -35,7 +32,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-        // 👇 search list adapter (semi-select allowed here)
         adapter = DestinationAdapter(requireContext(), destinationList, { destination ->
             Toast.makeText(
                 requireContext(),
@@ -46,34 +42,25 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         recyclerView.adapter = adapter
 
-        // swipe to remove only from search list
+        // Swipe to remove
         val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
             override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, t: RecyclerView.ViewHolder) = false
             override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) {
                 adapter.removeItem(vh.adapterPosition)
-                viewModel.saveSearch(etSearch.text.toString(), destinationList.toList()) // ✅ keep state
+                viewModel.saveSearch(etSearch.text.toString(), destinationList.toList())
             }
         }
         ItemTouchHelper(swipeHandler).attachToRecyclerView(recyclerView)
 
-        // ✅ FAB confirms semi-selected → visited
+        // FAB confirms semi-selected → push to HomeFragment
         fab.setOnClickListener {
             val selectedDestinations = destinationList.filter { it.isSelected }
 
             if (selectedDestinations.isNotEmpty()) {
-                // ✅ Reset semi-selected state (grey) in search list
-                selectedDestinations.forEach {
-                    it.isSelected = false
-                    // Do NOT set visited = true here
-                }
+                selectedDestinations.forEach { it.isSelected = false }
 
-                // Push to HomeFragment via shared ViewModel
                 viewModel.addDestinations(selectedDestinations)
-
-                // Save current search state
                 viewModel.saveSearch(etSearch.text.toString(), destinationList.toList())
-
-                // Refresh search list UI (remove grey highlight)
                 adapter.notifyDataSetChanged()
 
                 Toast.makeText(
@@ -86,7 +73,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
         }
 
-        // 🔄 Restore saved query + results if available
+        // Restore saved search
         viewModel.searchQuery.observe(viewLifecycleOwner) { savedQuery ->
             if (etSearch.text.isNullOrEmpty() && !savedQuery.isNullOrEmpty()) {
                 etSearch.setText(savedQuery)
@@ -99,7 +86,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
         }
 
-        // search input
+        // Search input listener
         etSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 val query = etSearch.text.toString().trim()
@@ -113,81 +100,107 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         destinationList.clear()
         adapter.notifyDataSetChanged()
 
-        if (query.length == 1) {
-            // 🔍 Local filter: show ALL countries containing the letter
-            val filtered = CountryUtils.countries
-                .filter { it.contains(query, ignoreCase = true) }
-                .map { name ->
-                    Destination(
-                        name = name,
-                        location = "",
-                        visited = false,
-                        isSelected = false
-                    )
+        if (query.length <= 1) {
+            // 🔹 Short queries → show all countries containing the letter
+            CoroutineScope(Dispatchers.IO).launch {
+                val filtered = CountryUtils.countries
+                    .filter { it.contains(query, ignoreCase = true) }
+
+                // Fetch info from RestCountries API one by one
+                for (name in filtered) {
+                    val dest = try {
+                        val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
+                        Destination(
+                            name = name,
+                            location = "",
+                            imageUrl = countryResponse?.flags?.png ?: "",
+                            continent = countryResponse?.region ?: "",
+                            capital = countryResponse?.capital?.firstOrNull() ?: "",
+                            population = countryResponse?.population ?: 0L,
+                            visited = false,
+                            isSelected = false
+                        )
+                    } catch (e: Exception) {
+                        Destination(
+                            name = name,
+                            location = "",
+                            imageUrl = "",
+                            continent = "",
+                            capital = "",
+                            population = 0L,
+                            visited = false,
+                            isSelected = false
+                        )
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        destinationList.add(dest)
+                        adapter.notifyItemInserted(destinationList.size - 1)
+                    }
                 }
 
-            destinationList.addAll(filtered)
-            adapter.notifyDataSetChanged()
-
-            // ✅ Save search state
-            viewModel.saveSearch(query, destinationList.toList())
+                // Save search state
+                withContext(Dispatchers.Main) {
+                    viewModel.saveSearch(query, destinationList.toList())
+                }
+            }
         } else {
-            // Use Wikipedia API for longer queries
+            // 🔹 Longer queries → fetch Wikipedia + RestCountries info
             fetchWikipediaDestinations(query)
         }
     }
 
+
     private fun fetchWikipediaDestinations(query: String) {
+        destinationList.clear()
+        adapter.notifyDataSetChanged()
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = WikiRetrofitClient.instance.searchDestinations(query)
                 val titles = response[1] as List<String>
                 val descriptions = response[2] as List<String>
 
-                val apiDestinations = titles.mapIndexed { index, title ->
-                    // Check if title is a valid country first
-                    if (!CountryUtils.countries.contains(title)) return@mapIndexed null
+                for ((index, title) in titles.withIndex()) {
+                    if (!CountryUtils.countries.contains(title)) continue
 
-                    try {
-                        val countryResponse = RestCountriesClient.api.getCountry(title)
-                        val country = countryResponse.firstOrNull()
-
+                    val dest = try {
+                        val countryResponse = RestCountriesClient.api.getCountry(title).firstOrNull()
                         Destination(
                             name = title,
                             location = descriptions.getOrNull(index) ?: "",
-                            imageUrl = country?.flags?.png ?: "",
-                            continent = country?.region ?: "Unknown",
-                            capital = country?.capital?.firstOrNull() ?: "Unknown",
-                            population = country?.population ?: 0L,
+                            imageUrl = countryResponse?.flags?.png ?: "",
+                            continent = countryResponse?.region ?: "",
+                            capital = countryResponse?.capital?.firstOrNull() ?: "",
+                            population = countryResponse?.population ?: 0L,
                             visited = false,
                             isSelected = false
                         )
                     } catch (e: Exception) {
-                        // If API fails, still create destination but with placeholders
                         Destination(
                             name = title,
                             location = descriptions.getOrNull(index) ?: "",
                             imageUrl = "",
-                            continent = "Unknown",
-                            capital = "Unknown",
+                            continent = "",
+                            capital = "",
                             population = 0L,
                             visited = false,
                             isSelected = false
                         )
                     }
-                }.filterNotNull() // Remove nulls
 
-                activity?.runOnUiThread {
-                    destinationList.clear()
-                    destinationList.addAll(apiDestinations)
-                    adapter.notifyDataSetChanged()
+                    withContext(Dispatchers.Main) {
+                        destinationList.add(dest)
+                        adapter.notifyItemInserted(destinationList.size - 1)
+                    }
+                }
 
-                    // Save search state
+                withContext(Dispatchers.Main) {
                     viewModel.saveSearch(query, destinationList.toList())
                 }
 
             } catch (e: Exception) {
-                activity?.runOnUiThread {
+                withContext(Dispatchers.Main) {
                     Toast.makeText(requireContext(), "API Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
