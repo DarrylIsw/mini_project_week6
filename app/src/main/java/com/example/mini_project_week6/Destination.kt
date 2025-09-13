@@ -11,5 +11,6 @@ data class Destination(
     val imageUrl: String = "",
     var visited: Boolean = false,     // True = added to HomeFragment list
     var isSelected: Boolean = false,  // Keep your old logic (if used elsewhere)
-    var semiSelected: Boolean = false // 👈 NEW: used in search to mark grey state
+    var semiSelected: Boolean = false, // 👈 NEW: used in search to mark grey state
+    var flagUrl: String = ""   // 👈 new field for country flag
 ) : Parcelable

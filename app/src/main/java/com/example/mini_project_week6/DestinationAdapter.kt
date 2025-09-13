@@ -73,7 +73,8 @@ class DestinationAdapter(
 
             Glide.with(context)
                 .load(destination.imageUrl)
-                .placeholder(R.drawable.placeholder_image)
+                .placeholder(R.drawable.flag_placeholder_bg)
+                .error(R.drawable.flag_placeholder_bg)
                 .into(imageIv)
 
             if (isHomeList) {

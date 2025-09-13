@@ -17,10 +17,13 @@
         <!-- Destination Image -->
         <ImageView
             android:id="@+id/ivDestination"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:scaleType="centerCrop"
-            android:src="@drawable/placeholder_image"/>
+            android:layout_width="80dp"
+            android:layout_height="50dp"
+            android:scaleType="fitCenter"
+            android:layout_gravity="center_vertical"
+            android:background="@drawable/flag_placeholder_bg"
+            android:contentDescription="Country Flag"/>
+
 
         <!-- Text info -->
         <LinearLayout

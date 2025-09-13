@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+
 class MainFragment : Fragment(R.layout.fragment_main) {
 
     private lateinit var recyclerView: RecyclerView
@@ -140,31 +141,37 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = WikiRetrofitClient.instance.searchDestinations(query)
-
                 val titles = response[1] as List<String>
                 val descriptions = response[2] as List<String>
 
                 val apiDestinations = titles.mapIndexed { index, title ->
+                    // Check if title is a valid country first
+                    if (!CountryUtils.countries.contains(title)) return@mapIndexed null
+
+                    // Try fetching flag
+                    val flagUrl = try {
+                        val flagResponse = RestCountriesClient.api.getCountry(title)
+                        flagResponse.firstOrNull()?.flags?.png ?: ""
+                    } catch (e: Exception) { "" }
+
                     Destination(
                         name = title,
                         location = descriptions.getOrNull(index) ?: "",
+                        imageUrl = flagUrl,
                         visited = false,
                         isSelected = false
                     )
-                }
-
-                val filtered = apiDestinations.filter { dest ->
-                    CountryUtils.countries.contains(dest.name)
-                }
+                }.filterNotNull() // Remove nulls
 
                 activity?.runOnUiThread {
                     destinationList.clear()
-                    destinationList.addAll(filtered)
+                    destinationList.addAll(apiDestinations)
                     adapter.notifyDataSetChanged()
 
-                    // ✅ Save search state
+                    // Save search state
                     viewModel.saveSearch(query, destinationList.toList())
                 }
+
             } catch (e: Exception) {
                 activity?.runOnUiThread {
                     Toast.makeText(requireContext(), "API Error: ${e.message}", Toast.LENGTH_LONG).show()
