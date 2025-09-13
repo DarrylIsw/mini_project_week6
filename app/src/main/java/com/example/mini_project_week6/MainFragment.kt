@@ -109,7 +109,29 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     private fun startSearch(query: String) {
         destinationList.clear()
         adapter.notifyDataSetChanged()
-        fetchWikipediaDestinations(query)
+
+        if (query.length == 1) {
+            // 🔍 Local filter: show ALL countries containing the letter
+            val filtered = CountryUtils.countries
+                .filter { it.contains(query, ignoreCase = true) }
+                .map { name ->
+                    Destination(
+                        name = name,
+                        location = "",
+                        visited = false,
+                        isSelected = false
+                    )
+                }
+
+            destinationList.addAll(filtered)
+            adapter.notifyDataSetChanged()
+
+            // ✅ Save search state
+            viewModel.saveSearch(query, destinationList.toList())
+        } else {
+            // Use Wikipedia API for longer queries
+            fetchWikipediaDestinations(query)
+        }
     }
 
     private fun fetchWikipediaDestinations(query: String) {
