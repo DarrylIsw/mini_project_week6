@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">mini_project_week6</string>
+    <string name="search">Search</string>
+
 </resources>
