@@ -52,6 +52,10 @@ class DestinationAdapter(
         notifyDataSetChanged()
     }
 
+    fun getItem(position: Int): Destination {
+        return destinations[position]
+    }
+
     inner class DestinationViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val nameTv: TextView = itemView.findViewById(R.id.tvName)
         private val imageIv: ImageView = itemView.findViewById(R.id.ivDestination)

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:padding="16dp"
     tools:context=".HomeFragment">
 
@@ -26,15 +27,31 @@
         android:background="@android:color/darker_gray"
         android:layout_marginBottom="12dp"/>
 
-    <!-- RecyclerView for Saved Countries -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvSavedCountries"
+    <!-- FrameLayout for RecyclerView + Empty State -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingBottom="8dp"
-        android:scrollbars="vertical"
-        tools:listitem="@layout/item_destination"/>
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvSavedCountries"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:scrollbars="vertical"
+            tools:listitem="@layout/item_destination"/>
+
+        <!-- Empty state message -->
+        <TextView
+            android:id="@+id/tvEmptyState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="No countries added yet. Select from the search tab!"
+            android:gravity="center"
+            android:textColor="@android:color/darker_gray"
+            android:visibility="gone"
+            android:textSize="16sp"/>
+
+    </FrameLayout>
 
 </LinearLayout>
