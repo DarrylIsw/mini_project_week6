@@ -1,6 +1,10 @@
 package com.example.mini_project_week6
 
+import android.animation.ArgbEvaluator
+import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,7 +18,7 @@ class DestinationAdapter(
     private val context: Context,
     private val destinations: MutableList<Destination>,
     private val onItemClick: (Destination) -> Unit,
-    private val isHomeList: Boolean = false // 👈 default = search, true = home
+    private val isHomeList: Boolean = false // false = MainFragment search list
 ) : RecyclerView.Adapter<DestinationAdapter.DestinationViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DestinationViewHolder {
@@ -28,12 +32,12 @@ class DestinationAdapter(
 
         holder.itemView.setOnClickListener {
             if (!isHomeList) {
-                // In search list → toggle semiSelected (grey highlight)
+                // MainFragment → toggle semi-selected
                 destination.isSelected = !destination.isSelected
                 notifyItemChanged(position)
                 onItemClick(destination)
             } else {
-                // In home list → just show toast or click action
+                // HomeFragment → just show toast / click
                 onItemClick(destination)
             }
         }
@@ -52,17 +56,20 @@ class DestinationAdapter(
         notifyDataSetChanged()
     }
 
-    fun getItem(position: Int): Destination {
-        return destinations[position]
-    }
+    fun getItem(position: Int): Destination = destinations[position]
 
     inner class DestinationViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val nameTv: TextView = itemView.findViewById(R.id.tvName)
-        private val imageIv: ImageView = itemView.findViewById(R.id.ivDestination)
         private val cardView: CardView = itemView.findViewById(R.id.cardView)
+        private val imageIv: ImageView = itemView.findViewById(R.id.ivDestination)
+        private val nameTv: TextView = itemView.findViewById(R.id.tvName)
+        private val locationTv: TextView = itemView.findViewById(R.id.tvLocation)
+        private val priceTv: TextView = itemView.findViewById(R.id.tvPrice)
+        private val ivTick: ImageView = itemView.findViewById(R.id.ivTick)
 
         fun bind(destination: Destination) {
             nameTv.text = destination.name
+            locationTv.text = destination.location
+            priceTv.text = destination.price ?: ""
 
             Glide.with(context)
                 .load(destination.imageUrl)
@@ -70,16 +77,59 @@ class DestinationAdapter(
                 .into(imageIv)
 
             if (isHomeList) {
-                // ✅ Always white in HomeFragment
+                // White background in HomeFragment
                 cardView.setCardBackgroundColor(context.getColor(R.color.white))
-            } else {
-                // ✅ Grey if semi-selected in MainFragment
-                if (destination.isSelected) {
-                    cardView.setCardBackgroundColor(context.getColor(R.color.gray_visited))
-                } else {
-                    cardView.setCardBackgroundColor(context.getColor(R.color.white))
+
+                // Set tick drawable based on visited state
+                ivTick.setImageResource(
+                    if (destination.visited) R.drawable.ic_tick_filled
+                    else R.drawable.ic_tick_empty
+                )
+                ivTick.visibility = View.VISIBLE
+
+                ivTick.setOnClickListener {
+                    destination.visited = !destination.visited
+
+                    // Animate tick (fade in/out)
+                    if (destination.visited) {
+                        ivTick.setImageResource(R.drawable.ic_tick_filled)
+                        ivTick.alpha = 0f
+                        ivTick.animate().alpha(1f).setDuration(300).start()
+                    } else {
+                        ivTick.setImageResource(R.drawable.ic_tick_empty)
+                        ivTick.animate().alpha(0f).setDuration(300).withEndAction {
+                            ivTick.alpha = 1f
+                        }.start()
+                    }
+
+                    // Animate card background
+                    val fromColor = (cardView.background as? ColorDrawable)?.color ?: Color.WHITE
+                    val toColor = if (destination.visited) context.getColor(R.color.green_faint) else context.getColor(R.color.white)
+                    val colorAnim = ValueAnimator.ofObject(ArgbEvaluator(), fromColor, toColor)
+                    colorAnim.duration = 300
+                    colorAnim.addUpdateListener { animator ->
+                        cardView.setCardBackgroundColor(animator.animatedValue as Int)
+                    }
+                    colorAnim.start()
+
+                    // Move visited item to top
+                    moveVisitedToTop(adapterPosition)
                 }
+
+            } else {
+                // Grey if semi-selected in MainFragment
+                cardView.setCardBackgroundColor(
+                    if (destination.isSelected) context.getColor(R.color.gray_visited)
+                    else context.getColor(R.color.white)
+                )
+                ivTick.visibility = View.GONE
             }
         }
+    }
+
+    private fun moveVisitedToTop(position: Int) {
+        val dest = destinations.removeAt(position)
+        destinations.add(0, dest)
+        notifyItemMoved(position, 0)
     }
 }

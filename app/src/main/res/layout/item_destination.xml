@@ -9,11 +9,10 @@
     app:cardCornerRadius="8dp"
     app:cardElevation="4dp">
 
-    <LinearLayout
-        android:orientation="horizontal"
-        android:padding="8dp"
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:padding="8dp">
 
         <!-- Destination Image -->
         <ImageView
@@ -23,12 +22,14 @@
             android:scaleType="centerCrop"
             android:src="@drawable/placeholder_image"/>
 
+        <!-- Text info -->
         <LinearLayout
             android:orientation="vertical"
-            android:layout_marginStart="8dp"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1">
+            android:layout_toEndOf="@id/ivDestination"
+            android:layout_marginStart="8dp"
+            android:layout_alignParentTop="true">
 
             <TextView
                 android:id="@+id/tvName"
@@ -54,5 +55,15 @@
                 android:textSize="14sp"
                 android:textColor="@android:color/holo_green_dark"/>
         </LinearLayout>
-    </LinearLayout>
+
+        <!-- Tick mark -->
+        <ImageView
+            android:id="@+id/ivTick"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/ic_tick_empty"
+            android:visibility="gone"/>
+    </RelativeLayout>
 </androidx.cardview.widget.CardView>

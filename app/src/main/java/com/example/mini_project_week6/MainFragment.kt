@@ -38,7 +38,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         adapter = DestinationAdapter(requireContext(), destinationList, { destination ->
             Toast.makeText(
                 requireContext(),
-                "${destination.name} is ${if (destination.visited) "visited" else "not visited"}",
+                "${destination.name} is ${if (destination.visited) "selected" else "not selected"}",
                 Toast.LENGTH_SHORT
             ).show()
         }, isHomeList = false)
@@ -75,7 +75,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
                 Toast.makeText(
                     requireContext(),
-                    "Added ${selectedDestinations.size} countries to visited!",
+                    "Added ${selectedDestinations.size} countries to Bucket List!",
                     Toast.LENGTH_SHORT
                 ).show()
             } else {
