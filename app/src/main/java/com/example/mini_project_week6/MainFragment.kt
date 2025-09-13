@@ -5,6 +5,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -13,7 +14,6 @@ import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import androidx.fragment.app.activityViewModels
 
 class MainFragment : Fragment(R.layout.fragment_main) {
 
@@ -34,7 +34,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-        // 👇 Search list adapter (not home, so allow semi-select grey)
+        // 👇 search list adapter (semi-select allowed here)
         adapter = DestinationAdapter(requireContext(), destinationList, { destination ->
             Toast.makeText(
                 requireContext(),
@@ -45,11 +45,12 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
         recyclerView.adapter = adapter
 
-        // Swipe to remove from search list (not from HomeFragment)
+        // swipe to remove only from search list
         val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
             override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, t: RecyclerView.ViewHolder) = false
             override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) {
                 adapter.removeItem(vh.adapterPosition)
+                viewModel.saveSearch(etSearch.text.toString(), destinationList.toList()) // ✅ keep state
             }
         }
         ItemTouchHelper(swipeHandler).attachToRecyclerView(recyclerView)
@@ -60,14 +61,16 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
             if (selectedDestinations.isNotEmpty()) {
                 selectedDestinations.forEach {
-                    it.visited = true     // mark visited
-                    it.isSelected = false // reset grey state
+                    it.visited = true
+                    it.isSelected = false
                 }
 
-                // Push confirmed visited items to shared VM → HomeFragment
+                // push visited to HomeFragment
                 viewModel.addDestinations(selectedDestinations)
 
-                // Refresh search list UI (remove grey)
+                // save current search state
+                viewModel.saveSearch(etSearch.text.toString(), destinationList.toList())
+
                 adapter.notifyDataSetChanged()
 
                 Toast.makeText(
@@ -80,7 +83,20 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
         }
 
-        // Handle search input
+        // 🔄 Restore saved query + results if available
+        viewModel.searchQuery.observe(viewLifecycleOwner) { savedQuery ->
+            if (etSearch.text.isNullOrEmpty() && !savedQuery.isNullOrEmpty()) {
+                etSearch.setText(savedQuery)
+            }
+        }
+        viewModel.searchResults.observe(viewLifecycleOwner) { savedResults ->
+            if (destinationList.isEmpty() && savedResults.isNotEmpty()) {
+                destinationList.addAll(savedResults)
+                adapter.notifyDataSetChanged()
+            }
+        }
+
+        // search input
         etSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 val query = etSearch.text.toString().trim()
@@ -108,14 +124,11 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                     Destination(
                         name = title,
                         location = descriptions.getOrNull(index) ?: "",
-                        price = "",
-                        imageUrl = "",
                         visited = false,
                         isSelected = false
                     )
                 }
 
-                // Only show valid countries
                 val filtered = apiDestinations.filter { dest ->
                     CountryUtils.countries.contains(dest.name)
                 }
@@ -124,8 +137,10 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                     destinationList.clear()
                     destinationList.addAll(filtered)
                     adapter.notifyDataSetChanged()
-                }
 
+                    // ✅ Save search state
+                    viewModel.saveSearch(query, destinationList.toList())
+                }
             } catch (e: Exception) {
                 activity?.runOnUiThread {
                     Toast.makeText(requireContext(), "API Error: ${e.message}", Toast.LENGTH_LONG).show()
