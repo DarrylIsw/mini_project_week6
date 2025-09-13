@@ -6,9 +6,10 @@ import retrofit2.converter.gson.GsonConverterFactory
 object RestCountriesClient {
     val api: CountryApi by lazy {
         Retrofit.Builder()
-            .baseUrl("https://restcountries.com/")
+            .baseUrl("https://restcountries.com/") // must end with /
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(CountryApi::class.java)
     }
 }
+

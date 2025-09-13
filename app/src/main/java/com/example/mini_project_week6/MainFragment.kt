@@ -148,19 +148,33 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                     // Check if title is a valid country first
                     if (!CountryUtils.countries.contains(title)) return@mapIndexed null
 
-                    // Try fetching flag
-                    val flagUrl = try {
-                        val flagResponse = RestCountriesClient.api.getCountry(title)
-                        flagResponse.firstOrNull()?.flags?.png ?: ""
-                    } catch (e: Exception) { "" }
+                    try {
+                        val countryResponse = RestCountriesClient.api.getCountry(title)
+                        val country = countryResponse.firstOrNull()
 
-                    Destination(
-                        name = title,
-                        location = descriptions.getOrNull(index) ?: "",
-                        imageUrl = flagUrl,
-                        visited = false,
-                        isSelected = false
-                    )
+                        Destination(
+                            name = title,
+                            location = descriptions.getOrNull(index) ?: "",
+                            imageUrl = country?.flags?.png ?: "",
+                            continent = country?.region ?: "Unknown",
+                            capital = country?.capital?.firstOrNull() ?: "Unknown",
+                            population = country?.population ?: 0L,
+                            visited = false,
+                            isSelected = false
+                        )
+                    } catch (e: Exception) {
+                        // If API fails, still create destination but with placeholders
+                        Destination(
+                            name = title,
+                            location = descriptions.getOrNull(index) ?: "",
+                            imageUrl = "",
+                            continent = "Unknown",
+                            capital = "Unknown",
+                            population = 0L,
+                            visited = false,
+                            isSelected = false
+                        )
+                    }
                 }.filterNotNull() // Remove nulls
 
                 activity?.runOnUiThread {
