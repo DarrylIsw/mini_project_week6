@@ -6,7 +6,7 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 data class Destination(
     val name: String,
-    val location: String = "",
+    var location: String = "",
     val price: String = "",
     val imageUrl: String = "",
     var visited: Boolean = false,     // True = added to HomeFragment list

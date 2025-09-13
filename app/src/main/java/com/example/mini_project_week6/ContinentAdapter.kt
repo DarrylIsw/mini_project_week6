@@ -40,8 +40,7 @@ class ContinentAdapter(
                 "Asia" -> R.drawable.ic_asia
                 "Europe" -> R.drawable.ic_europe
                 "Africa" -> R.drawable.ic_africa
-                "North America" -> R.drawable.ic_north_america
-                "South America" -> R.drawable.ic_south_america
+                "Americas" -> R.drawable.ic_americas  // new icon
                 "Oceania" -> R.drawable.ic_oceania
                 else -> R.drawable.ic_continent_placeholder
             }

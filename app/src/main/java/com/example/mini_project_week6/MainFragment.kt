@@ -13,6 +13,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.*
+import androidx.activity.OnBackPressedCallback
+
 
 class MainFragment : Fragment(R.layout.fragment_main) {
 
@@ -25,7 +27,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     // Continent recycler and adapter
     private lateinit var recyclerContinents: RecyclerView
     private lateinit var continentAdapter: ContinentAdapter
-    private val continents = listOf("Asia", "Europe", "Africa", "North America", "South America", "Oceania")
+    private val continents = listOf("Asia", "Europe", "Africa", "Americas", "Oceania")
     private val allCountries = mutableListOf<Destination>() // store all loaded countries
 
     private val viewModel: SharedViewModel by activityViewModels()
@@ -33,18 +35,23 @@ class MainFragment : Fragment(R.layout.fragment_main) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Initialize views first
         recyclerView = view.findViewById(R.id.recyclerView)
         etSearch = view.findViewById(R.id.etSearch)
         fab = view.findViewById(R.id.fabAdd)
-
         recyclerContinents = view.findViewById(R.id.recyclerContinents)
 
-        recyclerContinents.layoutManager = GridLayoutManager(requireContext(), 3) // 2x3 grid
+        // Clear search bar safely after initialization
+        etSearch.setText("")
+
+        // Setup continent RecyclerView
+        recyclerContinents.layoutManager = GridLayoutManager(requireContext(), 3)
         continentAdapter = ContinentAdapter(requireContext(), continents) { continent ->
             showCountriesForContinent(continent)
         }
         recyclerContinents.adapter = continentAdapter
 
+        // Setup country RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         adapter = DestinationAdapter(requireContext(), destinationList, { destination ->
             Toast.makeText(
@@ -55,7 +62,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }, isHomeList = false)
         recyclerView.adapter = adapter
 
-        // Swipe to remove
+        // Swipe to remove countries from search list
         val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
             override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, t: RecyclerView.ViewHolder) = false
             override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) {
@@ -93,7 +100,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         viewModel.searchResults.observe(viewLifecycleOwner) { savedResults ->
             if (destinationList.isEmpty() && savedResults.isNotEmpty()) {
                 destinationList.addAll(savedResults)
-                allCountries.addAll(savedResults)
+                allCountries.addAll(savedResults) // keep allCountries updated
                 adapter.notifyDataSetChanged()
             }
         }
@@ -102,32 +109,71 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         etSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 val query = etSearch.text.toString().trim()
-                if (query.isNotEmpty()) startSearch(query)
+                startSearch(query)
                 true
             } else false
         }
+
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (recyclerView.visibility == View.VISIBLE) {
+                    // If showing search results, hide them and show continents
+                    recyclerView.visibility = View.GONE
+                    recyclerContinents.visibility = View.VISIBLE
+                } else {
+                    // Go back to HomeFragment
+                    isEnabled = false
+                    requireActivity().onBackPressed()
+                }
+            }
+        })
     }
 
     private fun showCountriesForContinent(continent: String) {
+        destinationList.clear()
+        adapter.notifyDataSetChanged()
+
+        // fade out continent cards
         recyclerContinents.animate().alpha(0f).setDuration(300).withEndAction {
             recyclerContinents.visibility = View.GONE
         }
-        recyclerView.visibility = View.VISIBLE
 
-        val filteredCountries = allCountries.filter { it.continent.equals(continent, ignoreCase = true) }
-        destinationList.clear()
-        destinationList.addAll(filteredCountries)
-        adapter.notifyDataSetChanged()
+        // Fetch countries for this continent from API
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                for (name in CountryUtils.countries) {
+                    val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
+                    if (countryResponse?.region.equals(continent, ignoreCase = true)) {
+                        val dest = Destination(
+                            name = name,
+                            location = "", // optionally fetch from Wikipedia
+                            imageUrl = countryResponse?.flags?.png ?: "",
+                            continent = countryResponse?.region ?: "",
+                            capital = countryResponse?.capital?.firstOrNull() ?: "",
+                            population = countryResponse?.population ?: 0L,
+                            visited = false,
+                            isSelected = false
+                        )
+                        withContext(Dispatchers.Main) {
+                            destinationList.add(dest)
+                            allCountries.add(dest)
+                            adapter.notifyItemInserted(destinationList.size - 1)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(requireContext(), "API Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
-    private fun toggleContinentAndCountryView(showCountries: Boolean) {
-        recyclerContinents.visibility = if (showCountries) View.GONE else View.VISIBLE
-        recyclerView.visibility = if (showCountries) View.VISIBLE else View.GONE
-    }
     private fun startSearch(query: String) {
         if (query.isEmpty()) {
             // Show continents, hide country list
             recyclerContinents.visibility = View.VISIBLE
+            recyclerContinents.alpha = 1f
             recyclerView.visibility = View.GONE
             destinationList.clear()
             adapter.notifyDataSetChanged()
@@ -145,28 +191,13 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             CoroutineScope(Dispatchers.IO).launch {
                 val filtered = CountryUtils.countries.filter { it.contains(query, ignoreCase = true) }
                 for (name in filtered) {
-                    val dest = try {
-                        val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
-                        Destination(
-                            name = name,
-                            location = "",
-                            imageUrl = countryResponse?.flags?.png ?: "",
-                            continent = countryResponse?.region ?: "",
-                            capital = countryResponse?.capital?.firstOrNull() ?: "",
-                            population = countryResponse?.population ?: 0L,
-                            visited = false,
-                            isSelected = false
-                        )
-                    } catch (e: Exception) {
-                        Destination(name = name, location = "", imageUrl = "", continent = "", capital = "", population = 0L, visited = false, isSelected = false)
-                    }
-
+                    val dest = fetchCountryInfo(name)
                     withContext(Dispatchers.Main) {
                         destinationList.add(dest)
+                        allCountries.add(dest) // ✅ keep allCountries updated
                         adapter.notifyItemInserted(destinationList.size - 1)
                     }
                 }
-
                 withContext(Dispatchers.Main) {
                     viewModel.saveSearch(query, destinationList.toList())
                 }
@@ -174,6 +205,33 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         } else {
             // Longer queries → Wikipedia API
             fetchWikipediaDestinations(query)
+        }
+    }
+
+    private suspend fun fetchCountryInfo(name: String, location: String = ""): Destination {
+        return try {
+            val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
+            Destination(
+                name = name,
+                location = location,
+                imageUrl = countryResponse?.flags?.png ?: "",
+                continent = countryResponse?.region ?: "",
+                capital = countryResponse?.capital?.firstOrNull() ?: "",
+                population = countryResponse?.population ?: 0L,
+                visited = false,
+                isSelected = false
+            )
+        } catch (e: Exception) {
+            Destination(
+                name = name,
+                location = location,
+                imageUrl = "",
+                continent = "",
+                capital = "",
+                population = 0L,
+                visited = false,
+                isSelected = false
+            )
         }
     }
 
@@ -190,34 +248,10 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 for ((index, title) in titles.withIndex()) {
                     if (!CountryUtils.countries.contains(title)) continue
 
-                    val dest = try {
-                        val countryResponse = RestCountriesClient.api.getCountry(title).firstOrNull()
-                        Destination(
-                            name = title,
-                            location = descriptions.getOrNull(index) ?: "",
-                            imageUrl = countryResponse?.flags?.png ?: "",
-                            continent = countryResponse?.region ?: "",
-                            capital = countryResponse?.capital?.firstOrNull() ?: "",
-                            population = countryResponse?.population ?: 0L,
-                            visited = false,
-                            isSelected = false
-                        )
-                    } catch (e: Exception) {
-                        Destination(
-                            name = title,
-                            location = descriptions.getOrNull(index) ?: "",
-                            imageUrl = "",
-                            continent = "",
-                            capital = "",
-                            population = 0L,
-                            visited = false,
-                            isSelected = false
-                        )
-                    }
-
+                    val dest = fetchCountryInfo(title, descriptions.getOrNull(index) ?: "")
                     withContext(Dispatchers.Main) {
                         destinationList.add(dest)
-                        allCountries.add(dest) // ✅ important
+                        allCountries.add(dest) // ✅ keep allCountries updated
                         adapter.notifyItemInserted(destinationList.size - 1)
                     }
                 }
