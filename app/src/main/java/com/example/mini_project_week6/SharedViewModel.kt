@@ -34,6 +34,11 @@ class SharedViewModel : ViewModel() {
         _destinations.value = emptyList()
     }
 
+    fun clearSearch() {
+        _searchQuery.value = ""   // or null
+        _searchResults.value = emptyList()
+    }
+
     fun saveSearch(query: String, results: List<Destination>) {
         _searchQuery.value = query
         _searchResults.value = results

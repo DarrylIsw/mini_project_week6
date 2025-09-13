@@ -41,8 +41,9 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         fab = view.findViewById(R.id.fabAdd)
         recyclerContinents = view.findViewById(R.id.recyclerContinents)
 
-        // Clear search bar safely after initialization
+        // ✅ Clear search bar and reset saved search in ViewModel
         etSearch.setText("")
+        viewModel.clearSearch() // clears _searchQuery and _searchResults
 
         // Setup continent RecyclerView
         recyclerContinents.layoutManager = GridLayoutManager(requireContext(), 3)
