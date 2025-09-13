@@ -77,10 +77,15 @@ class DestinationAdapter(
                 .into(imageIv)
 
             if (isHomeList) {
-                // White background in HomeFragment
-                cardView.setCardBackgroundColor(context.getColor(R.color.white))
+                // HomeFragment behavior
 
-                // Set tick drawable based on visited state
+                // Background: green if visited, white otherwise
+                cardView.setCardBackgroundColor(
+                    if (destination.visited) context.getColor(R.color.green_faint)
+                    else context.getColor(R.color.white)
+                )
+
+                // Tick drawable: filled if visited, empty otherwise
                 ivTick.setImageResource(
                     if (destination.visited) R.drawable.ic_tick_filled
                     else R.drawable.ic_tick_empty
@@ -88,21 +93,16 @@ class DestinationAdapter(
                 ivTick.visibility = View.VISIBLE
 
                 ivTick.setOnClickListener {
+                    // Toggle visited state only in HomeFragment
                     destination.visited = !destination.visited
 
-                    // Animate tick (fade in/out)
-                    if (destination.visited) {
-                        ivTick.setImageResource(R.drawable.ic_tick_filled)
-                        ivTick.alpha = 0f
-                        ivTick.animate().alpha(1f).setDuration(300).start()
-                    } else {
-                        ivTick.setImageResource(R.drawable.ic_tick_empty)
-                        ivTick.animate().alpha(0f).setDuration(300).withEndAction {
-                            ivTick.alpha = 1f
-                        }.start()
-                    }
+                    // Update tick drawable
+                    ivTick.setImageResource(
+                        if (destination.visited) R.drawable.ic_tick_filled
+                        else R.drawable.ic_tick_empty
+                    )
 
-                    // Animate card background
+                    // Animate background color
                     val fromColor = (cardView.background as? ColorDrawable)?.color ?: Color.WHITE
                     val toColor = if (destination.visited) context.getColor(R.color.green_faint) else context.getColor(R.color.white)
                     val colorAnim = ValueAnimator.ofObject(ArgbEvaluator(), fromColor, toColor)
@@ -112,12 +112,16 @@ class DestinationAdapter(
                     }
                     colorAnim.start()
 
-                    // Move visited item to top
-                    moveVisitedToTop(adapterPosition)
+                    // Reorder item in the HomeFragment list
+                    if (destination.visited) {
+                        moveVisitedToTop(adapterPosition)
+                    } else {
+                        moveVisitedToBottom(adapterPosition)
+                    }
                 }
 
             } else {
-                // Grey if semi-selected in MainFragment
+                // MainFragment search behavior: semi-select
                 cardView.setCardBackgroundColor(
                     if (destination.isSelected) context.getColor(R.color.gray_visited)
                     else context.getColor(R.color.white)
@@ -127,6 +131,12 @@ class DestinationAdapter(
         }
     }
 
+    private fun moveVisitedToBottom(position: Int) {
+        val item = destinations[position]
+        destinations.removeAt(position)
+        destinations.add(item) // move to end
+        notifyItemMoved(position, destinations.lastIndex)
+    }
     private fun moveVisitedToTop(position: Int) {
         val dest = destinations.removeAt(position)
         destinations.add(0, dest)

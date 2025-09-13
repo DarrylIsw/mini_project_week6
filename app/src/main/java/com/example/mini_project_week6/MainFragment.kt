@@ -60,17 +60,19 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             val selectedDestinations = destinationList.filter { it.isSelected }
 
             if (selectedDestinations.isNotEmpty()) {
+                // ✅ Reset semi-selected state (grey) in search list
                 selectedDestinations.forEach {
-                    it.visited = true
                     it.isSelected = false
+                    // Do NOT set visited = true here
                 }
 
-                // push visited to HomeFragment
+                // Push to HomeFragment via shared ViewModel
                 viewModel.addDestinations(selectedDestinations)
 
-                // save current search state
+                // Save current search state
                 viewModel.saveSearch(etSearch.text.toString(), destinationList.toList())
 
+                // Refresh search list UI (remove grey highlight)
                 adapter.notifyDataSetChanged()
 
                 Toast.makeText(
