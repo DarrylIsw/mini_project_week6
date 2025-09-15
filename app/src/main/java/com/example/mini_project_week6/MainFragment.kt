@@ -137,18 +137,28 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         recyclerView.visibility = View.VISIBLE
 
         destinationList.clear()
+        allCountries.clear()
         adapter.notifyDataSetChanged()
+
+        // Map continent to API region
+        val regionMap = mapOf(
+            "Asia" to "Asia",
+            "Europe" to "Europe",
+            "Africa" to "Africa",
+            "Americas" to "Americas",
+            "Oceania" to "Oceania"
+        )
+        val apiRegion = regionMap[continent] ?: return
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Filter countries by continent using your CountryUtils + RestCountriesClient
-                val filteredCountries = mutableListOf<Destination>()
                 for (name in CountryUtils.countries) {
                     val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
-                    if (countryResponse?.region.equals(continent, ignoreCase = true)) {
+
+                    if (countryResponse?.region.equals(apiRegion, ignoreCase = true)) {
                         val dest = Destination(
                             name = name,
-                            location = "", // optionally fetch from Wikipedia
+                            location = "",
                             imageUrl = countryResponse?.flags?.png ?: "",
                             continent = countryResponse?.region ?: "",
                             capital = countryResponse?.capital?.firstOrNull() ?: "",
@@ -156,18 +166,21 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                             visited = false,
                             isSelected = false
                         )
-                        filteredCountries.add(dest)
+
+                        // Update UI one by one
+                        withContext(Dispatchers.Main) {
+                            destinationList.add(dest)
+                            allCountries.add(dest)
+                            adapter.notifyItemInserted(destinationList.size - 1)
+                        }
                     }
                 }
 
+                // Save whole list in ViewModel after loading
                 withContext(Dispatchers.Main) {
-                    destinationList.addAll(filteredCountries)
-                    allCountries.addAll(filteredCountries)
-                    adapter.notifyDataSetChanged()
-
-                    // Optional: save in ViewModel
                     viewModel.saveSearch(continent, destinationList.toList())
                 }
+
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(requireContext(), "API Error: ${e.message}", Toast.LENGTH_LONG).show()
