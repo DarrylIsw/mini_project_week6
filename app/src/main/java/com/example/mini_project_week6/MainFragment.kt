@@ -48,7 +48,8 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         // Setup continent RecyclerView
         recyclerContinents.layoutManager = GridLayoutManager(requireContext(), 3)
         continentAdapter = ContinentAdapter(requireContext(), continents) { continent ->
-            showCountriesForContinent(continent)
+            // Instead of showCountriesForContinent, use startSearch with continent filter
+            showCountriesByContinent(continent)
         }
         recyclerContinents.adapter = continentAdapter
 
@@ -130,18 +131,18 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         })
     }
 
-    private fun showCountriesForContinent(continent: String) {
+    private fun showCountriesByContinent(continent: String) {
+        // Hide continents, show country list
+        recyclerContinents.visibility = View.GONE
+        recyclerView.visibility = View.VISIBLE
+
         destinationList.clear()
         adapter.notifyDataSetChanged()
 
-        // fade out continent cards
-        recyclerContinents.animate().alpha(0f).setDuration(300).withEndAction {
-            recyclerContinents.visibility = View.GONE
-        }
-
-        // Fetch countries for this continent from API
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // Filter countries by continent using your CountryUtils + RestCountriesClient
+                val filteredCountries = mutableListOf<Destination>()
                 for (name in CountryUtils.countries) {
                     val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
                     if (countryResponse?.region.equals(continent, ignoreCase = true)) {
@@ -155,12 +156,17 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                             visited = false,
                             isSelected = false
                         )
-                        withContext(Dispatchers.Main) {
-                            destinationList.add(dest)
-                            allCountries.add(dest)
-                            adapter.notifyItemInserted(destinationList.size - 1)
-                        }
+                        filteredCountries.add(dest)
                     }
+                }
+
+                withContext(Dispatchers.Main) {
+                    destinationList.addAll(filteredCountries)
+                    allCountries.addAll(filteredCountries)
+                    adapter.notifyDataSetChanged()
+
+                    // Optional: save in ViewModel
+                    viewModel.saveSearch(continent, destinationList.toList())
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -169,6 +175,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
         }
     }
+
 
     private fun startSearch(query: String) {
         if (query.isEmpty()) {
