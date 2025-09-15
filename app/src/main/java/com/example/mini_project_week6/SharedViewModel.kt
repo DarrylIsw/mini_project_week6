@@ -15,27 +15,32 @@ class SharedViewModel : ViewModel() {
     private val _searchResults = MutableLiveData<List<Destination>>(emptyList())
     val searchResults: LiveData<List<Destination>> = _searchResults
 
-    // Add new destinations to the list
+    // Add new destinations (deduplication included)
     fun addDestinations(newDestinations: List<Destination>) {
         val currentList = _destinations.value?.toMutableList() ?: mutableListOf()
-        currentList.addAll(newDestinations)
-        _destinations.value = currentList
+
+        for (dest in newDestinations) {
+            // Prevent duplicate by name
+            if (currentList.none { it.name == dest.name }) {
+                currentList.add(dest.copy(isSelected = true)) // ensure added items are marked
+            }
+        }
+
+        _destinations.value = currentList.toList() // force LiveData emit
     }
 
-    // Optional: remove a destination
     fun removeDestination(destination: Destination) {
         val currentList = _destinations.value?.toMutableList() ?: mutableListOf()
-        currentList.remove(destination)
-        _destinations.value = currentList
+        currentList.removeAll { it.name == destination.name }
+        _destinations.value = currentList.toList()
     }
 
-    // Optional: clear all
     fun clearDestinations() {
         _destinations.value = emptyList()
     }
 
     fun clearSearch() {
-        _searchQuery.value = ""   // or null
+        _searchQuery.value = ""
         _searchResults.value = emptyList()
     }
 
@@ -44,3 +49,4 @@ class SharedViewModel : ViewModel() {
         _searchResults.value = results
     }
 }
+
