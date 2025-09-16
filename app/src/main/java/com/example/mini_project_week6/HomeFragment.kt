@@ -68,26 +68,30 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             ) {
                 if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
                     val itemView = viewHolder.itemView
-                    val paint = Paint()
-                    val backgroundColor = Color.parseColor("#FFCDD2") // faint red
-                    paint.color = backgroundColor
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+                    paint.color = Color.parseColor("#F44336") // Base red
+                    paint.alpha = 150 // 0 = fully transparent, 255 = fully solid
+
+                    // Match cardView style (12dp radius)
+                    val cornerRadius = 32f // px → adjust for density (12dp approx)
                     val background = RectF(
-                        itemView.right + dX,
-                        itemView.top.toFloat(),
-                        itemView.right.toFloat(),
-                        itemView.bottom.toFloat()
+                        itemView.right + dX + 32f, // small padding inside
+                        itemView.top + 16f,
+                        itemView.right.toFloat() - 16f,
+                        itemView.bottom.toFloat() - 16f
                     )
-                    c.drawRect(background, paint)
+                    c.drawRoundRect(background, cornerRadius, cornerRadius, paint)
 
-                    // Draw "Delete" text
-                    paint.color = Color.RED
-                    paint.textSize = 40f
-                    paint.textAlign = Paint.Align.RIGHT
-                    val textMargin = 32f
-                    val y = itemView.top + itemView.height / 2f + 15f
-                    c.drawText("Delete", itemView.right - textMargin, y, paint)
+                    // Draw "Delete" text inside rounded card
+                    paint.color = Color.WHITE
+                    paint.textSize = 42f
+                    paint.textAlign = Paint.Align.CENTER
+                    val x = background.centerX()
+                    val y = background.centerY() - (paint.descent() + paint.ascent()) / 2
+                    c.drawText("Delete", x, y, paint)
                 }
+
                 super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
             }
         }
