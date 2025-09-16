@@ -189,7 +189,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-
     private fun startSearch(query: String) {
         if (query.isEmpty()) {
             // Show continents, hide country list
@@ -225,7 +224,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
         } else {
             // Longer queries → Wikipedia API
-            fetchWikipediaDestinations(query)
+            fetchRestCountries(query)
         }
     }
 
@@ -256,23 +255,30 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
-    private fun fetchWikipediaDestinations(query: String) {
+    private fun fetchRestCountries(query: String) {
         destinationList.clear()
         adapter.notifyDataSetChanged()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response = WikiRetrofitClient.instance.searchDestinations(query)
-                val titles = response[1] as List<String>
-                val descriptions = response[2] as List<String>
+                val response = RestCountriesClient.api.getCountry(query)
 
-                for ((index, title) in titles.withIndex()) {
-                    if (!CountryUtils.countries.contains(title)) continue
+                for (countryResponse in response) {
+                    val dest = Destination(
+                        name = countryResponse.name?.common ?: query, // safe call
+                        location = "", // no description here
+                        imageUrl = countryResponse.flags?.png ?: "",
+                        continent = countryResponse.region ?: "",
+                        capital = countryResponse.capital?.firstOrNull() ?: "",
+                        population = countryResponse.population ?: 0L,
+                        visited = false,
+                        isSelected = false
+                    )
 
-                    val dest = fetchCountryInfo(title, descriptions.getOrNull(index) ?: "")
+                    // Update UI one by one
                     withContext(Dispatchers.Main) {
                         destinationList.add(dest)
-                        allCountries.add(dest) // ✅ keep allCountries updated
+                        allCountries.add(dest)
                         adapter.notifyItemInserted(destinationList.size - 1)
                     }
                 }
@@ -280,7 +286,6 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 withContext(Dispatchers.Main) {
                     viewModel.saveSearch(query, destinationList.toList())
                 }
-
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(requireContext(), "API Error: ${e.message}", Toast.LENGTH_LONG).show()
