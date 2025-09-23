@@ -16,20 +16,37 @@ import kotlinx.coroutines.*
 import androidx.activity.OnBackPressedCallback
 
 
+// MainFragment = search + browse screen (continents + countries + add to bucket list)
 class MainFragment : Fragment(R.layout.fragment_main) {
 
+    // 🔹 RecyclerView for showing countries (search results or by continent)
     private lateinit var recyclerView: RecyclerView
+
+    // 🔹 Adapter for displaying list of countries
     private lateinit var adapter: DestinationAdapter
+
+    // 🔹 Mutable list holding current search results or countries
     private val destinationList = mutableListOf<Destination>()
+
+    // 🔹 Input field for searching countries
     private lateinit var etSearch: TextInputEditText
+
+    // 🔹 FloatingActionButton for confirming selected countries → add to bucket list
     private lateinit var fab: FloatingActionButton
 
-    // Continent recycler and adapter
+    // 🔹 RecyclerView for displaying grid of continents
     private lateinit var recyclerContinents: RecyclerView
-    private lateinit var continentAdapter: ContinentAdapter
-    private val continents = listOf("Asia", "Europe", "Africa", "Americas", "Oceania")
-    private val allCountries = mutableListOf<Destination>() // store all loaded countries
 
+    // 🔹 Adapter for displaying continents (Asia, Europe, etc.)
+    private lateinit var continentAdapter: ContinentAdapter
+
+    // 🔹 Hardcoded list of continents
+    private val continents = listOf("Asia", "Europe", "Africa", "Americas", "Oceania")
+
+    // 🔹 Cache for all countries loaded (used to reset or reuse data)
+    private val allCountries = mutableListOf<Destination>()
+
+    // 🔹 Shared ViewModel to persist data across fragments
     private val viewModel: SharedViewModel by activityViewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -64,7 +81,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }, isHomeList = false)
         recyclerView.adapter = adapter
 
-        // Swipe to remove countries from search list
+        // Delete Function - Swipe to remove countries from search list
         val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
             override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, t: RecyclerView.ViewHolder) = false
             override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) {
@@ -74,7 +91,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
         ItemTouchHelper(swipeHandler).attachToRecyclerView(recyclerView)
 
-        // FAB confirms semi-selected → push to HomeFragment
+        // FAB Button - FAB confirms semi-selected → push to HomeFragment
         fab.setOnClickListener {
             val selectedDestinations = destinationList.filter { it.isSelected }
             if (selectedDestinations.isNotEmpty()) {
@@ -116,6 +133,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             } else false
         }
 
+        // Back Press Handling
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (recyclerView.visibility == View.VISIBLE) {
@@ -131,6 +149,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         })
     }
 
+    // 🔹 Show list of countries for a specific continent
     private fun showCountriesByContinent(continent: String) {
         // Hide continents, show country list
         recyclerContinents.visibility = View.GONE
@@ -189,6 +208,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
+    // 🔹 Start a search by query (short = filter local, long = API call)
     private fun startSearch(query: String) {
         if (query.isEmpty()) {
             // Show continents, hide country list
@@ -223,11 +243,12 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 }
             }
         } else {
-            // Longer queries → Wikipedia API
+            // Longer queries → RestCountries API
             fetchRestCountries(query)
         }
     }
 
+    // 🔹 Fetch details of a single country by name
     private suspend fun fetchCountryInfo(name: String, location: String = ""): Destination {
         return try {
             val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
@@ -255,6 +276,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
     }
 
+    // 🔹 Fetch countries by name from RestCountries API
     private fun fetchRestCountries(query: String) {
         destinationList.clear()
         adapter.notifyDataSetChanged()

@@ -1,6 +1,9 @@
 package com.example.mini_project_week6
 
+// Utility object to hold a predefined list of supported country names
 object CountryUtils {
+    // Immutable set of country names (unique values, no duplicates allowed)
+    // This can be used for validation, autocomplete, or filtering API results
     val countries = setOf(
         "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Argentina", "Armenia",
         "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados",
