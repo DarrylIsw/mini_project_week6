@@ -14,6 +14,11 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.*
 import androidx.activity.OnBackPressedCallback
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import com.google.android.material.snackbar.Snackbar
+
 
 
 // MainFragment = search + browse screen (continents + countries + add to bucket list)
@@ -151,6 +156,12 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     // 🔹 Show list of countries for a specific continent
     private fun showCountriesByContinent(continent: String) {
+        // ✅ Check connection before API call
+        if (!isOnline()) {
+            showNoConnectionSnackbar { showCountriesByContinent(continent) } // retry same call
+            return
+        }
+
         // Hide continents, show country list
         recyclerContinents.visibility = View.GONE
         recyclerView.visibility = View.VISIBLE
@@ -226,15 +237,21 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         destinationList.clear()
         adapter.notifyDataSetChanged()
 
+        // ✅ Check for internet connection before doing any network calls
+        if (!isOnline()) {
+            showNoConnectionSnackbar { startSearch(query) } // Retry when user taps "Retry"
+            return
+        }
+
         if (query.length <= 1) {
-            // Short queries → fetch countries containing the letter
+            // Short queries → filter from local CountryUtils list
             CoroutineScope(Dispatchers.IO).launch {
                 val filtered = CountryUtils.countries.filter { it.contains(query, ignoreCase = true) }
                 for (name in filtered) {
-                    val dest = fetchCountryInfo(name)
+                    val dest = fetchCountryInfo(name) // ✅ still safe to call
                     withContext(Dispatchers.Main) {
                         destinationList.add(dest)
-                        allCountries.add(dest) // ✅ keep allCountries updated
+                        allCountries.add(dest) // keep allCountries updated
                         adapter.notifyItemInserted(destinationList.size - 1)
                     }
                 }
@@ -244,12 +261,26 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             }
         } else {
             // Longer queries → RestCountries API
-            fetchRestCountries(query)
+            fetchRestCountries(query) // ✅ also protected by isOnline()
         }
     }
 
     // 🔹 Fetch details of a single country by name
     private suspend fun fetchCountryInfo(name: String, location: String = ""): Destination {
+        // ✅ Check connection before hitting API
+        if (!isOnline()) {
+            return Destination(
+                name = name,
+                location = location,
+                imageUrl = "",
+                continent = "",
+                capital = "",
+                population = 0L,
+                visited = false,
+                isSelected = false
+            )
+        }
+
         return try {
             val countryResponse = RestCountriesClient.api.getCountry(name).firstOrNull()
             Destination(
@@ -278,6 +309,12 @@ class MainFragment : Fragment(R.layout.fragment_main) {
 
     // 🔹 Fetch countries by name from RestCountries API
     private fun fetchRestCountries(query: String) {
+        // ✅ Check connection before API call
+        if (!isOnline()) {
+            showNoConnectionSnackbar { fetchRestCountries(query) } // retry same call
+            return
+        }
+
         destinationList.clear()
         adapter.notifyDataSetChanged()
 
@@ -314,5 +351,28 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 }
             }
         }
+    }
+
+    // ✅ Check if device is online
+    private fun isOnline(): Boolean {
+        val connectivityManager =
+            requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    // ✅ Show Snackbar when offline
+    private fun showNoConnectionSnackbar(onRetry: () -> Unit) {
+        val snackbar = Snackbar.make(
+            requireView(), //  use the Fragment's root view
+            "No internet connection",
+            Snackbar.LENGTH_INDEFINITE
+        ).setAction("Retry") {
+            onRetry()
+        }
+
+        snackbar.duration = 5000 // 5 seconds
+        snackbar.show()
     }
 }
