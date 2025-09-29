@@ -96,12 +96,12 @@ class MainFragment : Fragment(R.layout.fragment_main) {
         }
         ItemTouchHelper(swipeHandler).attachToRecyclerView(recyclerView)
 
-        // FAB Button - FAB confirms semi-selected → push to HomeFragment
+        // Floating Action Button - FAB confirms semi-selected → push to HomeFragment
         fab.setOnClickListener {
             val selectedDestinations = destinationList.filter { it.isSelected }
             if (selectedDestinations.isNotEmpty()) {
                 selectedDestinations.forEach { it.isSelected = false }
-                viewModel.addDestinations(selectedDestinations)
+                viewModel.addDestinations(selectedDestinations) // Core Logic 3 is called here
                 viewModel.saveSearch(etSearch.text.toString(), destinationList.toList())
                 adapter.notifyDataSetChanged()
 
@@ -250,7 +250,7 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                 for (name in filtered) {
                     val dest = fetchCountryInfo(name) // ✅ still safe to call
                     withContext(Dispatchers.Main) {
-                        destinationList.add(dest)
+                        destinationList.add(dest) // Add destinations interactively
                         allCountries.add(dest) // keep allCountries updated
                         adapter.notifyItemInserted(destinationList.size - 1)
                     }

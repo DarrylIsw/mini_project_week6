@@ -95,8 +95,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 viewHolder: RecyclerView.ViewHolder,
                 dX: Float,
                 dY: Float,
-                actionState: Int,
-                isCurrentlyActive: Boolean
+                actionState: Int,                isCurrentlyActive: Boolean
             ) {
                 if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
                     val itemView = viewHolder.itemView
